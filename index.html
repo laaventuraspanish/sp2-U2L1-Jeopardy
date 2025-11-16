@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeopardy: Unidad 2 - De Viaje por Argentina</title>
+    <!-- Cargar Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1a33; /* Azul oscuro */
+            color: white;
+            transition: all 0.3s ease;
+            overflow-x: hidden;
+        }
+        .jeopardy-board {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 10px;
+        }
+        .category-header {
+            background-color: #0b1525;
+            font-size: 1rem;
+            font-weight: 900;
+            text-align: center;
+            padding: 12px 6px;
+            border-radius: 8px;
+            text-shadow: 2px 2px 4px #000000;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .question-cell {
+            background-color: #0a4f94; /* Azul clásico de Jeopardy */
+            color: #fce205; /* Amarillo/Dorado */
+            font-size: 2rem;
+            font-weight: 900;
+            text-align: center;
+            padding: 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.2s, opacity 0.5s;
+            text-shadow: 2px 2px 4px #000000;
+            user-select: none;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .question-cell:hover:not(.answered) {
+            background-color: #0d5fb7;
+        }
+        .answered {
+            background-color: #04254d;
+            color: #334155;
+            pointer-events: none;
+            cursor: default;
+            opacity: 0.8;
+            font-size: 1.5rem;
+            line-height: 1.5;
+        }
+        .modal-content {
+            background-color: #1e293b;
+        }
+        .score-card {
+            background-color: #1e293b;
+            border: 2px solid #0a4f94;
+            transition: all 0.3s ease;
+        }
+        .highlight-team {
+             border: 3px solid #fce205; /* Destacado para el equipo que escoge */
+             transform: scale(1.05);
+             box-shadow: 0 0 15px #fce205;
+        }
+        #timerBar {
+            height: 10px;
+            transition: width linear;
+        }
+        .option-button {
+            transition: background-color 0.2s ease;
+        }
+        
+        /* Estilos del Podio */
+        .podium-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 10px;
+            min-height: 350px;
+            background: linear-gradient(to top, #1e293b, #0d1a33);
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .podium-stand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            border-radius: 8px 8px 0 0;
+            padding: 20px;
+            color: black;
+            font-weight: bold;
+            text-align: center;
+            width: 120px;
+        }
+        .podium-1 {
+            height: 250px;
+            background-color: #ffd700; /* Oro */
+            border: 3px solid #fce205;
+            order: 2;
+        }
+        .podium-2 {
+            height: 200px;
+            background-color: #c0c0c0; /* Plata */
+            border: 3px solid #e0e0e0;
+            order: 1;
+        }
+        .podium-3 {
+            height: 150px;
+            background-color: #cd7f32; /* Bronce */
+            border: 3px solid #e69a4c;
+            order: 3;
+        }
+        .podium-place {
+            font-size: 2.5rem;
+            font-weight: 900;
+        }
+        .podium-team {
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+        .podium-score {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #2d3748;
+        }
+        .other-scores {
+            margin-top: 20px;
+            width: 100%;
+            text-align: center;
+        }
+        .other-score-item {
+            background-color: #2d3748;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- MODAL DE CONFIGURACIÓN INICIAL -->
+    <div id="setupModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex items-center justify-center">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold mb-6 text-yellow-400">¡Bienvenidos a Jeopardy!</h2>
+            <div class="mb-4">
+                <label for="teamCount" class="block text-lg font-medium mb-2">¿Cuántos equipos van a jugar? (2-8)</label>
+                <input type="number" id="teamCount" min="2" max="8" value="4" class="w-full p-3 rounded-lg bg-gray-700 text-white focus:ring-yellow-500 focus:border-yellow-500">
+            </div>
+            <div id="roundInfo" class="text-sm text-gray-400 mb-6">
+                Con 4 equipos, jugarás 4 rondas. La ronda 3 será 'Doble Jeopardy'.
+            </div>
+            <!-- Selector de equipo inicial (Radio) -->
+            <div class="mb-4">
+                <label class="block text-lg font-medium mb-2">¿Equipo que empieza?</label>
+                <div id="startTeamRadioGroup" class="space-y-2 max-h-32 overflow-y-auto">
+                    <!-- Opciones de radio se llenarán dinámicamente -->
+                </div>
+            </div>
+            <button onclick="startGame()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition duration-200">
+                ¡Empezar el Juego!
+            </button>
+        </div>
+    </div>
+ 
+    <!-- CONTENEDOR PRINCIPAL DEL JUEGO -->
+    <div id="gameContainer" class="hidden w-full">
+        <!-- Encabezado y Puntuaciones -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-4 border-b-4 border-yellow-500 pb-4">
+            <h1 class="text-4xl font-black text-yellow-400 mb-3 sm:mb-0">JEOPARDY - UNIDAD 2</h1>
+            <div class="flex items-center space-x-4">
+                <div id="gameStatus" class="text-2xl font-bold text-gray-300">Ronda 1</div>
+                <button id="endGameBtn" onclick="startFinalJeopardy()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                    Terminar Juego (Ir a Final Jeopardy)
+                </button>
+            </div>
+        </header>
+
+        <!-- Marcador -->
+        <div id="scoreboard" class="flex flex-wrap justify-center gap-4 mb-6">
+            <!-- Puntuaciones se insertarán aquí -->
+        </div>
+
+        <!-- Estado del Turno -->
+        <div id="turnStatus" class="text-center mb-6 p-4 bg-gray-700 rounded-xl shadow-inner">
+            <p class="text-2xl font-bold text-yellow-400">
+                Turno de: <span id="currentTeamName"></span>
+            </p>
+            <p class="text-lg text-gray-300">Preguntas restantes en esta ronda: <span id="questionsLeftInRound"></span></p>
+        </div>
+
+        <!-- Tablero de Jeopardy -->
+        <div id="jeopardyBoard" class="jeopardy-board">
+            <!-- El tablero se generará aquí -->
+        </div>
+    </div>
+ 
+    <!-- MODAL DE ANUNCIOS DE RONDA -->
+    <div id="announcementModal" class="fixed inset-0 bg-black bg-opacity-70 z-[100] hidden items-center justify-center transition-opacity duration-300">
+        <div id="announcementText" class="bg-blue-800 p-12 rounded-lg shadow-xl text-white text-5xl font-bold text-center">
+            <!-- El texto del anuncio se insertará aquí -->
+        </div>
+    </div>
+
+    <!-- MODAL DE PREGUNTAS -->
+    <div id="questionModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-40 hidden items-center justify-center transition-opacity duration-300">
+        <div class="modal-content p-6 rounded-xl shadow-2xl w-full max-w-2xl border-4 border-yellow-500">
+            <!-- Indicador de Tiempo -->
+            <div class="mb-4">
+                <div id="timerBarContainer" class="w-full bg-gray-700 rounded-full h-3">
+                    <div id="timerBar" class="h-3 rounded-full bg-green-500"></div>
+                </div>
+                <div id="timerText" class="text-center mt-2 text-lg font-bold text-yellow-400"></div>
+            </div>
+
+            <h3 id="modalCategory" class="text-3xl font-bold mb-4 text-center text-yellow-400"></h3>
+            <p id="modalValue" class="text-xl font-semibold mb-6 text-center text-gray-300"></p>
+            
+            <!-- Texto de la Pregunta -->
+            <p id="modalQuestion" class="text-2xl font-bold mb-8 p-4 bg-gray-700 rounded-lg"></p>
+
+            <!-- Opciones Múltiples (MC) -->
+            <div id="mcOptions" class="space-y-3 hidden">
+                <!-- Opciones se insertarán aquí -->
+            </div>
+
+            <!-- Respuesta Escrita (Type-in) -->
+            <div id="typeInAnswer" class="hidden space-y-4">
+                <label for="teamAnswer" class="block text-lg font-medium text-gray-300">Respuesta del equipo:</label>
+                <input type="text" id="teamAnswer" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400 focus:ring-yellow-500 focus:border-yellow-500" placeholder="Escribe tu respuesta aquí...">
+                <button id="submitBtn" onclick="submitAnswer()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                    Responder
+                </button>
+            </div>
+            
+            <!-- Controles de Robo (Steal) -->
+            <div id="stealControls" class="mt-4 p-4 bg-red-800 rounded-lg hidden">
+                <p id="stealMessage" class="text-red-200 mb-2 font-bold">¡Incorrecto! ¡Otro equipo puede robar!</p>
+                <!-- Lógica de temporizador de robo actualizada: el temporizador empieza DESPUÉS de seleccionar -->
+                <select id="stealingTeamSelect" class="w-full p-3 rounded-lg bg-gray-700 text-white mb-2" onchange="startStealTimer()">
+                    <!-- Opciones de robo se insertarán aquí -->
+                </select>
+                <!-- Controles de robo (MC y Texto) se mostrarán aquí -->
+                <div id="stealMcOptions" class="space-y-3 hidden"></div>
+                <div id="stealTypeIn" class="hidden">
+                    <input type="text" id="stealAnswer" class="w-full p-3 rounded-lg bg-gray-700 text-white placeholder-gray-400" placeholder="Respuesta del equipo que roba...">
+                </div>
+                <button id="stealBtn" onclick="submitSteal()" class="w-full mt-2 bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-200" disabled>
+                    ¡Robar!
+                </button>
+            </div>
+            
+            <!-- Feedback de Respuesta -->
+            <div id="answerFeedback" class="mt-4 p-4 rounded-lg text-center hidden">
+                <p class="text-xl font-bold mb-2">Respuesta Correcta:</p>
+                <p id="correctAnswerDisplay" class="text-3xl font-black text-yellow-300"></p>
+                <button onclick="closeModal()" class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg">
+                    Cerrar y Continuar
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MODAL DE FINAL JEOPARDY -->
+    <!-- CORRECCIÓN: items-start, overflow-y-auto, y padding (pt-12) para arreglar el scroll -->
+    <div id="finalJeopardyModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-50 hidden items-start justify-center overflow-y-auto pt-12 pb-12">
+        <div class="modal-content p-8 rounded-xl shadow-2xl w-full max-w-4xl border-4 border-red-500">
+            <h2 class="text-4xl font-black text-red-400 text-center mb-6">¡FINAL JEOPARDY!</h2>
+            
+            <div id="wagerContainer" class="mb-8 p-4 bg-gray-700 rounded-lg">
+                <h3 class="text-xl font-bold mb-3">1. Apuestas (Wagers)</h3>
+                <p class="text-gray-300 mb-4">Cada equipo debe escribir la cantidad que quiere apostar (hasta su puntaje actual).</p>
+                <div id="wagerInputs" class="space-y-3">
+                    <!-- Entradas de apuestas se insertarán aquí -->
+                </div>
+                <button onclick="showFinalQuestion()" class="mt-6 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg">
+                    Continuar a la Pregunta Final
+                </button>
+            </div>
+
+            <div id="finalQuestionContainer" class="hidden">
+                <h3 class="text-xl font-bold mb-3">2. Pregunta</h3>
+                <p class="text-2xl font-bold mb-8 p-4 bg-gray-700 rounded-lg text-center">
+                    Categoría: **Información Cultural de Argentina**
+                </p>
+                <p id="finalQuestionText" class="text-3xl font-extrabold text-yellow-300 text-center mb-8">
+                    ¿Cuál es el baile nacional de Argentina, famoso por su ritmo y pasión?
+                </p>
+                <h3 class="text-xl font-bold mb-3">3. Respuestas</h3>
+                <div id="finalAnswerInputs" class="space-y-3">
+                    <!-- Entradas de respuestas finales se insertarán aquí -->
+                </div>
+                <!-- CORRECCIÓN: Este es el botón que no se veía. Ahora será visible. -->
+                <button onclick="revealFinalAnswer()" class="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">
+                    Revelar Respuestas y Puntajes
+                </button>
+            </div>
+
+            <!-- Contenedor de Resultados Finales (CON PODIO) -->
+            <div id="finalResultsContainer" class="hidden mt-8 pt-6 border-t border-gray-600">
+                <p class="text-2xl font-bold text-center mb-4">Respuesta Correcta: <span class="text-yellow-400 font-black">El Tango</span></p>
+                <h3 class="text-2xl font-black text-center mb-6">RESULTADOS FINALES</h3>
+                
+                <!-- Contenedor del Podio -->
+                <div class="podium-container" id="podium-main">
+                    <!-- Los 3 primeros puestos se insertarán aquí -->
+                </div>
+
+                <!-- Otros Puestos -->
+                <div class="other-scores" id="other-scores-list">
+                    <!-- Los puestos 4+ se insertarán aquí -->
+                </div>
+
+                <button onclick="resetGame()" class="mt-8 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">
+                    Reiniciar Juego
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DATOS DEL JUEGO ---
+        // Se usa 'let' para poder resetear las preguntas (estado 'answered') si fuera necesario
+        let jeopardyData = [
+            {
+                name: "Los paisajes y la geografía",
+                questions: [
+                    { value: 100, type: 'mc', question: "Es un lugar con muchos árboles, plantas y animales.", options: ["El desierto", "El bosque", "El glaciar", "La playa"], answer: "El bosque" },
+                    { value: 200, type: 'mc', question: "Es un cuerpo de agua dulce, como el Lago Nahuel Huapi.", options: ["El océano", "El río", "El lago", "La catarata"], answer: "El lago" },
+                    { value: 300, type: 'mc', question: "Es un lugar conocido como 'La Pampa' en Argentina. Es un espacio plano con animales como vacas.", options: ["La montaña", "La llanura", "El centro", "La selva"], answer: "La llanura" },
+                    { value: 400, type: 'text', question: "Lo opuesto del 'este' es el...", answer: "El oeste", keywords: ["oeste"] },
+                    { value: 500, type: 'text', question: "Es una gran caída de agua, como en Iguazú.", answer: "La catarata", keywords: ["catarata", "cascada"] }
+                ]
+            },
+            {
+                name: "El tiempo y las estaciones",
+                questions: [
+                    { value: 100, type: 'mc', question: "Cuando está nublado, normalmente...", options: ["Llueve", "Nieva", "Hace sol", "Hace calor"], answer: "Llueve" },
+                    { value: 200, type: 'mc', question: "¿Cuál es la estación en el 25 de diciembre?", options: ["El verano", "El otoño", "La primavera", "El invierno"], answer: "El invierno" },
+                    { value: 300, type: 'mc', question: "¿Cómo es la temperatura cuando está a 4℃?", options: ["Hace calor", "Hace buen tiempo", "Hace frío", "Hace sol"], answer: "Hace frío" },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 400, type: 'text', question: "A Chicago la llaman \"the windy city\" porque...", answer: "Hace viento", keywords: ["viento"] },
+                    { value: 500, type: 'text', question: "¿Qué estación es en Argentina cuando en Estados Unidos es otoño?", answer: "La primavera", keywords: ["primavera"] }
+                ]
+            },
+            {
+                name: "Los viajes",
+                questions: [
+                    { value: 100, type: 'mc', question: "La persona que visita un lugar por vacaciones.", options: ["El viajero", "El turista", "La entrada", "El regreso"], answer: "El turista" },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 200, type: 'mc', question: "A mí no me gusta improvisar, yo prefiero \_\_\_\_\_\_\_.", options: ["Regresar", "Vivir aventuras", "Planificar", "Descubrir"], answer: "Planificar" },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 300, type: 'mc', question: "Visitar un país diferente es viajar \_\_\_\_\_\_\_.", options: ["Al extranjero", "Al regreso", "A la entrada", "Al turista"], answer: "Al extranjero" },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 400, type: 'text', question: "No me gusta viajar con mi familia, prefiero viajar \_\_\_\_\_\_\_.", answer: "Solo / Sola", keywords: ["solo", "sola"] },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 500, type: 'text', question: "Es lo opuesto de salir o partir de casa.", answer: "Regresar", keywords: ["regresar", "regreso"] }
+                ]
+            },
+            {
+                name: "Los superlativos",
+                questions: [
+                    // CORRECCIÓN: Pregunta y respuesta actualizadas
+                    { value: 100, type: 'mc', question: "El Aconcagua es la montaña \_\_\_\_ de América.", options: ["más alta", "más baja", "menos alto", "más bonito"], answer: "más alta" },
+                    // CORRECCIÓN: Pista actualizada
+                    { value: 200, type: 'mc', question: "Las Cataratas del Iguazú son \_\_\_\_ (muy bonito).", options: ["Bellísimas", "El mejor", "Extremadamente", "Muy"], answer: "Bellísimas" },
+                    // CORRECCIÓN: Pregunta actualizada
+                    { value: 300, type: 'mc', question: "El asado argentino es \_\_\_\_\_\_\_.", options: ["Popularísimo", "Feísima", "Grandísimos", "El menos"], answer: "Popularísimo" },
+                    // CORRECCIÓN: Pista actualizada
+                    { value: 400, type: 'text', question: "El glaciar Perito Moreno es \_\_\_\_ (muy bueno) de Argentina.", answer: "El mejor", keywords: ["mejor"] },
+                    // CORRECCIÓN: Pista y respuesta actualizadas
+                    { value: 500, type: 'text', question: "Para un viajero, perder el pasaporte es de \_\_\_\_ (muy malo) cosas.", answer: "Las peores", keywords: ["peores"] }
+                ]
+            },
+            {
+                name: "Saber vs Conocer",
+                questions: [
+                    { value: 100, type: 'mc', question: "Yo no [__] bailar tango.", options: ["Conozco", "Saben", "Sé", "Conoce"], answer: "Sé" },
+                    { value: 200, type: 'mc', question: "¿Tú [__] la ciudad de Ushuaia?", options: ["Sabes", "Sé", "Conoces", "Saben"], answer: "Conoces" },
+                    { value: 300, type: 'mc', question: "¿Ustedes [__] dónde está el restaurante?", options: ["Conocen", "Sabes", "Saben", "Conoce"], answer: "Saben" },
+                    { value: 400, type: 'text', question: "Nosotros [__] al guía turístico, se llama Carlos.", answer: "Conocemos", keywords: ["conocemos"] },
+                    { value: 500, type: 'text', question: "Ella [__] hablar español muy bien.", answer: "Sabe", keywords: ["sabe"] }
+                ]
+            },
+            {
+                name: "Información cultural de Argentina",
+                questions: [
+                    { value: 100, type: 'mc', question: "¿Cuál es la capital de Argentina?", options: ["Santiago", "Montevideo", "Lima", "Buenos Aires"], answer: "Buenos Aires" },
+                    { value: 200, type: 'mc', question: "¿Cuál es la montaña más alta de América?", options: ["Monte Everest", "Monte McKinley", "El Aconcagua", "Monte Fuji"], answer: "El Aconcagua" },
+                    { value: 300, type: 'mc', question: "¿Cuál es una bebida hecha de plantas que es popular en Argentina?", options: ["El asado", "El mate", "Los alfajores", "La horchata"], answer: "El mate" },
+                    { value: 400, type: 'text', question: "¿En qué región de Argentina está el Parque Nacional Los Glajcires?", answer: "La Patagonia", keywords: ["patagonia"] },
+                    { value: 500, type: 'text', question: "¿Cuál es la ciudad más al sur de Argentina?", answer: "Ushuaia", keywords: ["ushuaia"] }
+                ]
+            }
+        ];
+
+        let game = {
+            teams: [],
+            currentTeamIndex: 0,
+            currentRound: 1,
+            totalRounds: 0,
+            isDoubleJeopardy: false
+        };
+
+        let currentQuestion = null;
+        let timerInterval = null;
+        let isStealingPhase = false;
+        let questionsAnsweredInRound = 0;
+
+        // --- LÓGICA DEL JUEGO ---
+
+        const TIMER_MC = 40;
+        const TIMER_TEXT = 50;
+        const TIMER_STEAL_MC = 15;
+        const TIMER_STEAL_TEXT = 20;
+
+        function calculateRounds(teamCount) {
+            if (teamCount >= 7) return 3;
+            if (teamCount >= 4) return 4;
+            return 5;
+        }
+
+        // Función ARREGLADA para manejar la actualización del setup
+        function updateTeamSetup() {
+            const countInput = document.getElementById('teamCount');
+            if (!countInput) return; 
+            
+            // Usar .value o 4 como valor por defecto
+            const count = parseInt(countInput.value) || 4;
+            const info = document.getElementById('roundInfo');
+            const startRadioGroup = document.getElementById('startTeamRadioGroup');
+
+            if (!info || !startRadioGroup) return; 
+
+            startRadioGroup.innerHTML = ''; // Limpiar radios
+            
+            if (count >= 2 && count <= 8) {
+                const rounds = calculateRounds(count);
+                const doubleRound = rounds - 1;
+                info.textContent = `Con ${count} equipos, jugarás ${rounds} rondas. La ronda ${doubleRound} será 'Doble Jeopardy'.`;
+                
+                // Llenar grupo de radio
+                for (let i = 0; i < count; i++) {
+                    const checked = (i === 0) ? 'checked' : '';
+                    startRadioGroup.innerHTML += `
+                        <label class="flex items-center p-3 rounded-lg bg-gray-700 hover:bg-gray-600 cursor-pointer">
+                            <input type="radio" name="startTeam" value="${i}" class="w-5 h-5 text-yellow-500 focus:ring-yellow-500" ${checked}>
+                            <span class="ml-3 text-lg">Equipo ${i + 1}</span>
+                        </label>
+                    `;
+                }
+            } else {
+                info.textContent = "Por favor, introduce un número de equipos entre 2 y 8.";
+            }
+        }
+
+        function startGame() {
+            const teamCountInput = document.getElementById('teamCount');
+            const teamCount = parseInt(teamCountInput.value);
+
+            if (teamCount < 2 || teamCount > 8) {
+                alert("Por favor, introduce un número de equipos entre 2 y 8.");
+                return;
+            }
+
+            game.totalRounds = calculateRounds(teamCount);
+            game.teams = Array.from({ length: teamCount }, (_, i) => ({ name: `Equipo ${i + 1}`, score: 0 }));
+            
+            // Leer desde el botón de radio seleccionado
+            const startTeamNode = document.querySelector('input[name="startTeam"]:checked');
+            if (!startTeamNode) {
+                alert("Error: No se pudo seleccionar el equipo inicial.");
+                game.currentTeamIndex = 0; // Por defecto al equipo 1 si algo falla
+            } else {
+                game.currentTeamIndex = parseInt(startTeamNode.value);
+            }
+
+            document.getElementById('setupModal').classList.add('hidden');
+            document.getElementById('gameContainer').classList.remove('hidden');
+            
+            updateScoreboard();
+            renderBoard();
+            startNewRound(); // Inicia la primera ronda
+        }
+        
+        function showAnnouncement(message, duration = 2000) {
+            const modal = document.getElementById('announcementModal');
+            const text = document.getElementById('announcementText');
+            text.textContent = message;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, duration);
+        }
+
+        function startNewRound() {
+            questionsAnsweredInRound = 0;
+            game.isDoubleJeopardy = (game.currentRound === game.totalRounds - 1);
+            
+            let roundName = `Ronda ${game.currentRound}`;
+            if (game.isDoubleJeopardy) {
+                roundName = "¡Doble Jeopardy!";
+            }
+            
+            showAnnouncement(roundName);
+            updateTurnStatus();
+            renderBoard(); // Volver a renderizar el tablero para Doble Jeopardy y preguntas respondidas
+        }
+
+        function getQuestionValue(value) {
+            return game.isDoubleJeopardy ? value * 2 : value;
+        }
+
+        function updateScoreboard() {
+            const scoreboard = document.getElementById('scoreboard');
+            scoreboard.innerHTML = '';
+            game.teams.forEach((team, index) => {
+                const scoreCard = document.createElement('div');
+                scoreCard.id = `score-card-${index}`;
+                scoreCard.className = 'score-card p-4 rounded-xl text-center min-w-[120px] shadow-lg';
+                scoreCard.innerHTML = `
+                    <p class="text-xl font-bold">${team.name}</p>
+                    <p class="text-3xl font-black ${team.score < 0 ? 'text-red-500' : 'text-yellow-500'}">$${team.score}</p>
+                `;
+                scoreboard.appendChild(scoreCard);
+            });
+            highlightCurrentTeam();
+        }
+
+        function highlightCurrentTeam() {
+            document.querySelectorAll('.score-card').forEach((card, index) => {
+                if (index === game.currentTeamIndex) {
+                    card.classList.add('highlight-team');
+                } else {
+                    card.classList.remove('highlight-team');
+                }
+            });
+        }
+        
+        function updateTurnStatus() {
+            document.getElementById('currentTeamName').textContent = game.teams[game.currentTeamIndex].name;
+            document.getElementById('questionsLeftInRound').textContent = game.teams.length - questionsAnsweredInRound;
+            
+            const roundStatus = `Ronda ${game.currentRound}`;
+            document.getElementById('gameStatus').textContent = game.isDoubleJeopardy ? "¡Doble Jeopardy!" : roundStatus;
+            
+            highlightCurrentTeam();
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('jeopardyBoard');
+            board.innerHTML = '';
+
+            // Renderizar Encabezados
+            jeopardyData.forEach(cat => {
+                board.innerHTML += `<div class="category-header text-center">${cat.name}</div>`;
+            });
+
+            // Renderizar Preguntas
+            const questionValues = [100, 200, 300, 400, 500];
+            questionValues.forEach(val => {
+                jeopardyData.forEach((cat, catIndex) => {
+                    const question = cat.questions.find(q => q.value === val);
+                    const cellId = `q-${catIndex}-${val}`;
+                    const currentVal = getQuestionValue(val);
+                    
+                    if (question) {
+                        const cell = document.createElement('div');
+                        cell.id = cellId;
+                        
+                        // ¡MEJORA DE LÓGICA!
+                        // Comprobar si la pregunta ya ha sido respondida en una ronda anterior
+                        if (question.answered) {
+                            cell.className = 'question-cell answered';
+                            cell.textContent = '---';
+                        } else {
+                            cell.className = 'question-cell';
+                            cell.textContent = `$${currentVal}`;
+                            cell.onclick = () => openQuestionModal(catIndex, val, cellId);
+                        }
+                        board.appendChild(cell);
+                    }
+                });
+            });
+        }
+
+        function openQuestionModal(catIndex, value, cellId) {
+            if (document.getElementById(cellId).classList.contains('answered')) return;
+            
+            currentQuestion = { ...jeopardyData[catIndex].questions.find(q => q.value === value) };
+            // Almacenar los índices originales para marcar la pregunta como respondida
+            currentQuestion.catIndex = catIndex;
+            currentQuestion.originalValue = value; 
+            
+            currentQuestion.value = getQuestionValue(value);
+            currentQuestion.cellId = cellId;
+            isStealingPhase = false;
+            
+            document.getElementById('modalCategory').textContent = jeopardyData[catIndex].name;
+            document.getElementById('modalValue').textContent = `Equipo: ${game.teams[game.currentTeamIndex].name} | Valor: $${currentQuestion.value}`;
+            document.getElementById('modalQuestion').textContent = currentQuestion.question;
+            
+            // Resetear estado del modal
+            document.getElementById('mcOptions').classList.add('hidden');
+            document.getElementById('typeInAnswer').classList.add('hidden');
+            document.getElementById('stealControls').classList.add('hidden');
+            document.getElementById('answerFeedback').classList.add('hidden');
+            
+            document.getElementById('teamAnswer').value = '';
+            document.getElementById('stealAnswer').value = '';
+
+            if (currentQuestion.type === 'mc') {
+                const mcOptionsDiv = document.getElementById('mcOptions');
+                mcOptionsDiv.innerHTML = '';
+                // Habilitar botones de MC
+                currentQuestion.options.forEach(option => {
+                    mcOptionsDiv.innerHTML += `<button class="option-button w-full text-left p-3 rounded-lg bg-gray-600 hover:bg-gray-500 text-xl font-semibold" onclick="checkAnswer(true, '${option.replace(/'/g, "\\'")}')">${option}</button>`;
+                });
+                mcOptionsDiv.classList.remove('hidden');
+                startTimer(TIMER_MC, () => handleTimeout(false));
+            } else {
+                document.getElementById('typeInAnswer').classList.remove('hidden');
+                document.getElementById('submitBtn').disabled = false; // Habilitar botón de envío
+                startTimer(TIMER_TEXT, () => handleTimeout(false));
+            }
+
+            document.getElementById('questionModal').classList.add('flex');
+            document.getElementById('questionModal').classList.remove('hidden');
+        }
+
+        function startTimer(duration, onFinishCallback) {
+            clearInterval(timerInterval);
+            let timeLeft = duration;
+            const timerBar = document.getElementById('timerBar');
+            const timerText = document.getElementById('timerText');
+            
+            timerBar.style.width = '100%';
+            timerBar.className = 'h-3 rounded-full bg-green-500';
+            timerBar.style.transitionDuration = '0s'; // Resetear transición
+
+            setTimeout(() => {
+                timerBar.style.transitionDuration = `${duration}s`;
+                timerBar.style.width = '0%';
+            }, 50);
+
+            timerText.textContent = `Tiempo restante: ${timeLeft} segundos`;
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerText.textContent = `Tiempo restante: ${timeLeft} segundos`;
+                
+                if (timeLeft <= 10 && timeLeft > 5) {
+                    timerBar.style.backgroundColor = '#f59e0b'; // Ámbar
+                } else if (timeLeft <= 5) {
+                    timerBar.style.backgroundColor = '#ef4444'; // Rojo
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerText.textContent = "¡Tiempo agotado!";
+                    onFinishCallback();
+                }
+            }, 1000);
+        }
+
+        function handleTimeout(isStealTimeout) {
+            if (isStealTimeout) {
+                // El tiempo de robo se acabó, simplemente revelar la respuesta
+                // No hay penalización por no robar a tiempo
+                revealAnswer();
+            } else {
+                // El tiempo de la respuesta inicial se acabó
+                // Deshabilitar botones
+                if (currentQuestion.type === 'mc') {
+                    document.querySelectorAll('#mcOptions .option-button').forEach(btn => btn.disabled = true);
+                } else {
+                    document.getElementById('submitBtn').disabled = true;
+                }
+                handleIncorrectAnswer();
+            }
+        }
+
+        function sanitizeAnswer(answer) {
+            if (typeof answer !== 'string') return '';
+            return answer.toLowerCase().trim()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+                .replace(/[¿?¡!.,]/g, ''); // Quitar puntuación
+        }
+
+        function checkTypeInAnswer(answer, keywords) {
+            const saneAnswer = sanitizeAnswer(answer);
+            if (saneAnswer.length === 0) return false;
+            return keywords.some(keyword => saneAnswer.includes(sanitizeAnswer(keyword)));
+        }
+
+        function checkAnswer(isMC, answer) {
+            clearInterval(timerInterval);
+            let isCorrect = false;
+
+            // Deshabilitar botones de MC para evitar clics dobles
+            if (isMC) {
+                document.querySelectorAll('#mcOptions .option-button').forEach(btn => btn.disabled = true);
+            }
+
+            if (isMC) {
+                isCorrect = (sanitizeAnswer(answer) === sanitizeAnswer(currentQuestion.answer));
+            } else {
+                isCorrect = checkTypeInAnswer(answer, currentQuestion.keywords);
+            }
+
+            if (isCorrect) {
+                handleCorrectAnswer();
+            } else {
+                handleIncorrectAnswer();
+            }
+        }
+
+        function submitAnswer() {
+            const teamAnswer = document.getElementById('teamAnswer').value;
+            checkAnswer(false, teamAnswer);
+        }
+
+        function handleCorrectAnswer() {
+            const value = currentQuestion.value;
+            game.teams[game.currentTeamIndex].score += value;
+            revealAnswer();
+        }
+
+        function handleIncorrectAnswer() {
+            isStealingPhase = true;
+            const value = currentQuestion.value;
+            
+            // Restar puntos al equipo original
+            game.teams[game.currentTeamIndex].score -= value;
+            
+            // Ocultar controles de respuesta inicial
+            document.getElementById('mcOptions').classList.add('hidden');
+            document.getElementById('typeInAnswer').classList.add('hidden');
+            
+            // Configurar y mostrar controles de robo
+            const stealControls = document.getElementById('stealControls');
+            const stealSelect = document.getElementById('stealingTeamSelect');
+            const stealMcDiv = document.getElementById('stealMcOptions');
+            const stealTypeInDiv = document.getElementById('stealTypeIn');
+            
+            stealSelect.innerHTML = '<option value="-1" selected disabled>Seleccionar equipo para robar...</option>';
+            game.teams.forEach((team, index) => {
+                if (index !== game.currentTeamIndex) { // No pueden robarse a sí mismos
+                    stealSelect.innerHTML += `<option value="${index}">${team.name}</option>`;
+                }
+            });
+            
+            // Preparar las opciones de robo (MC o Texto)
+            if (currentQuestion.type === 'mc') {
+                stealMcDiv.innerHTML = '';
+                currentQuestion.options.forEach(option => {
+                    // Usar comillas simples para el string de la opción, escapar las comillas internas
+                    const escapedOption = option.replace(/'/g, "\\'");
+                    stealMcDiv.innerHTML += `<button class="option-button w-full text-left p-3 rounded-lg bg-gray-600 hover:bg-gray-500 text-xl font-semibold" onclick="selectStealAnswer('${escapedOption}')">${option}</button>`;
+                });
+                stealMcDiv.classList.remove('hidden');
+                stealTypeInDiv.classList.add('hidden');
+            } else {
+                stealMcDiv.classList.add('hidden');
+                stealTypeInDiv.classList.remove('hidden');
+            }
+            
+            stealControls.classList.remove('hidden');
+            document.getElementById('stealBtn').disabled = true; // Deshabilitado hasta que se seleccione un equipo
+        }
+        
+        // Almacenar respuesta de robo de MC
+        let stealMcAnswer = '';
+        function selectStealAnswer(option) {
+            stealMcAnswer = option;
+            // Resaltar selección
+            const buttons = document.querySelectorAll('#stealMcOptions .option-button');
+            buttons.forEach(btn => {
+                if (btn.textContent === option) {
+                    btn.classList.add('bg-blue-500');
+                    btn.classList.remove('bg-gray-600');
+                } else {
+                    btn.classList.remove('bg-blue-500');
+                    btn.classList.add('bg-gray-600');
+                }
+            });
+        }
+
+        function startStealTimer() {
+            // Lógica actualizada: Iniciar temporizador SÓLO después de seleccionar un equipo
+            const stealTeamIndex = document.getElementById('stealingTeamSelect').value;
+            if (stealTeamIndex === "-1") {
+                document.getElementById('stealBtn').disabled = true;
+                return; // No empezar si la opción es "Seleccionar..."
+            }
+            
+            document.getElementById('stealBtn').disabled = false; // Habilitar botón de robo
+            
+            const duration = (currentQuestion.type === 'mc') ? TIMER_STEAL_MC : TIMER_STEAL_TEXT;
+            startTimer(duration, () => handleTimeout(true)); // Iniciar temporizador de robo
+        }
+
+        function submitSteal() {
+            clearInterval(timerInterval);
+            const stealTeamIndex = parseInt(document.getElementById('stealingTeamSelect').value);
+            if (stealTeamIndex === -1) return;
+            
+            let answer = '';
+            let isCorrect = false;
+
+            if (currentQuestion.type === 'mc') {
+                answer = stealMcAnswer;
+                isCorrect = (sanitizeAnswer(answer) === sanitizeAnswer(currentQuestion.answer));
+            } else {
+                answer = document.getElementById('stealAnswer').value;
+                isCorrect = checkTypeInAnswer(answer, currentQuestion.keywords);
+            }
+
+            if (isCorrect) {
+                // El equipo que roba GANA el valor
+                // El equipo original YA PERDIÓ el valor en handleIncorrectAnswer
+                game.teams[stealTeamIndex].score += currentQuestion.value;
+            } else {
+                // Si el robo es incorrecto, no pasa nada más (según las reglas)
+            }
+            
+            revealAnswer();
+        }
+
+        function revealAnswer() {
+            clearInterval(timerInterval);
+            document.getElementById('mcOptions').classList.add('hidden');
+            document.getElementById('typeInAnswer').classList.add('hidden');
+            document.getElementById('stealControls').classList.add('hidden');
+            
+            document.getElementById('correctAnswerDisplay').textContent = currentQuestion.answer;
+            document.getElementById('answerFeedback').classList.remove('hidden');
+            
+            document.getElementById(currentQuestion.cellId).classList.add('answered');
+            document.getElementById(currentQuestion.cellId).textContent = '---'; // Marcar como respondida
+            
+            // ¡MEJORA DE LÓGICA!
+            // Marcar la pregunta como respondida en la estructura de datos principal
+            // para que no vuelva a aparecer en futuras rondas.
+            const originalQuestion = jeopardyData[currentQuestion.catIndex].questions.find(q => q.value === currentQuestion.originalValue);
+            if (originalQuestion) {
+                originalQuestion.answered = true;
+            }
+            
+            updateScoreboard();
+        }
+
+        function closeModal() {
+            document.getElementById('questionModal').classList.add('hidden');
+            document.getElementById('questionModal').classList.remove('flex');
+            
+            advanceTurn();
+        }
+        
+        function advanceTurn() {
+            questionsAnsweredInRound++;
+            
+            if (questionsAnsweredInRound >= game.teams.length) {
+                // Fin de la ronda
+                game.currentRound++;
+                if (game.currentRound > game.totalRounds) {
+                    startFinalJeopardy();
+                } else {
+                    // El índice del equipo no se reinicia, continúa la rotación
+                    game.currentTeamIndex = (game.currentTeamIndex + 1) % game.teams.length;
+                    startNewRound(); // Inicia la nueva ronda
+                }
+            } else {
+                // Siguiente turno en la misma ronda
+                game.currentTeamIndex = (game.currentTeamIndex + 1) % game.teams.length;
+                updateTurnStatus();
+            }
+        }
+        
+        // --- LÓGICA DE FINAL JEOPARDY ---
+        
+        function startFinalJeopardy() {
+            // Ocultar modal de pregunta si está abierto
+            document.getElementById('questionModal').classList.add('hidden');
+            document.getElementById('questionModal').classList.remove('flex');
+            
+            // Ocultar tablero principal
+            document.getElementById('gameContainer').classList.add('hidden');
+            
+            // Mostrar modal de Final Jeopardy
+            document.getElementById('finalJeopardyModal').classList.remove('hidden');
+            document.getElementById('finalJeopardyModal').classList.add('flex');
+            
+            showAnnouncement("¡FINAL JEOPARDY!", 3000);
+            
+            const wagerInputs = document.getElementById('wagerInputs');
+            wagerInputs.innerHTML = '';
+            document.getElementById('finalAnswerInputs').innerHTML = '';
+            
+            game.teams.forEach((team, index) => {
+                const maxWager = Math.max(0, team.score);
+                
+                // Entrada de Apuesta
+                wagerInputs.innerHTML += `
+                    <div class="flex items-center space-x-3">
+                        <label class="w-2/5 font-semibold text-gray-200">${team.name} (Puntaje: $${team.score}):</label>
+                        <input type="number" id="wager-${index}" min="0" max="${maxWager}" value="0" class="w-3/5 p-3 rounded-lg bg-gray-600 text-white focus:ring-red-500 focus:border-red-500">
+                    </div>
+                `;
+
+                // Entrada de Respuesta
+                 document.getElementById('finalAnswerInputs').innerHTML += `
+                    <div class="flex flex-col space-y-2 p-3 border border-gray-600 rounded-lg">
+                        <label class="font-semibold text-gray-200">${team.name} - Respuesta:</label>
+                        <input type="text" id="final-answer-${index}" class="w-full p-3 rounded-lg bg-gray-600 text-white focus:ring-red-500 focus:border-red-500" placeholder="Escribe tu respuesta final...">
+                    </div>
+                `;
+            });
+            
+            // Ocultar todo menos el contenedor de apuestas
+            document.getElementById('wagerContainer').classList.remove('hidden');
+            document.getElementById('finalQuestionContainer').classList.add('hidden');
+            document.getElementById('finalResultsContainer').classList.add('hidden');
+        }
+
+        function showFinalQuestion() {
+            let allWagersValid = true;
+            game.wagers = [];
+            
+            game.teams.forEach((team, index) => {
+                const input = document.getElementById(`wager-${index}`);
+                const wager = parseInt(input.value);
+                const maxWager = parseInt(input.max);
+                
+                if (isNaN(wager) || wager < 0 || wager > maxWager) {
+                    alert(`¡El Equipo ${index + 1} tiene una apuesta inválida! Debe ser entre $0 y $${maxWager}.`);
+                    allWagersValid = false;
+                    return;
+                }
+                game.wagers[index] = wager;
+            });
+            
+            if (allWagersValid) {
+                document.getElementById('wagerContainer').classList.add('hidden');
+                document.getElementById('finalQuestionContainer').classList.remove('hidden');
+            }
+        }
+
+        function revealFinalAnswer() {
+            const correctAnswer = "tango"; 
+            const podiumDiv = document.getElementById('podium-main');
+            const othersDiv = document.getElementById('other-scores-list');
+            podiumDiv.innerHTML = '';
+            othersDiv.innerHTML = '';
+
+            const finalResults = [];
+
+            game.teams.forEach((team, index) => {
+                const answerInput = document.getElementById(`final-answer-${index}`).value.toLowerCase().trim();
+                const wager = game.wagers[index];
+                let isCorrect = answerInput.includes(correctAnswer);
+                
+                let resultText = '';
+                if (isCorrect) {
+                    team.score += wager;
+                    resultText = `(¡Correcto! +$${wager})`;
+                } else {
+                    team.score -= wager;
+                    resultText = `(Incorrecto -$${wager})`;
+                }
+
+                finalResults.push({
+                    name: team.name,
+                    score: team.score,
+                    answer: document.getElementById(`final-answer-${index}`).value,
+                    resultText: resultText
+                });
+            });
+
+            // Ordenar por puntuación final
+            finalResults.sort((a, b) => b.score - a.score);
+
+            // Mostrar Resultados en el Podio
+            finalResults.forEach((team, index) => {
+                const teamName = team.name;
+                const score = team.score;
+                const resultText = team.resultText;
+                const answer = team.answer;
+
+                if (index === 0) { // 1er Lugar
+                    podiumDiv.innerHTML += `
+                        <div class="podium-stand podium-1">
+                            <span class="podium-place">1º</span>
+                            <span class="podium-team">${teamName}</span>
+                            <span class="podium-score">$${score}</span>
+                            <span class="text-xs font-medium">${answer} ${resultText}</span>
+                        </div>
+                    `;
+                } else if (index === 1) { // 2do Lugar
+                    podiumDiv.innerHTML += `
+                        <div class="podium-stand podium-2">
+                            <span class="podium-place">2º</span>
+                            <span class="podium-team">${teamName}</span>
+                            <span class="podium-score">$${score}</span>
+                            <span class="text-xs font-medium">${answer} ${resultText}</span>
+                        </div>
+                    `;
+                } else if (index === 2) { // 3er Lugar
+                    podiumDiv.innerHTML += `
+                        <div class="podium-stand podium-3">
+                            <span class="podium-place">3º</span>
+                            <span class="podium-team">${teamName}</span>
+                            <span class="podium-score">$${score}</span>
+                            <span class="text-xs font-medium">${answer} ${resultText}</span>
+                        </div>
+                    `;
+                } else { // Otros puestos
+                    othersDiv.innerHTML += `
+                        <div class="other-score-item flex justify-between">
+                            <span><strong>${index + 1}º:</strong> ${teamName}</span>
+                            <span class="text-sm">(${answer})</span>
+                            <span>$${score} ${resultText}</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            document.getElementById('finalQuestionContainer').classList.add('hidden');
+            document.getElementById('finalResultsContainer').classList.remove('hidden');
+            updateScoreboard(); // Actualizar el marcador principal por última vez
+        }
+
+        function resetGame() {
+            // Resetear el estado 'answered' para un nuevo juego
+            jeopardyData.forEach(cat => {
+                cat.questions.forEach(q => q.answered = false);
+            });
+            // Recargar la página es la forma más limpia de reiniciar
+            window.location.reload();
+        }
+
+        // --- INICIALIZAR ---
+        // CORRECCIÓN: Llamar al listener de DOMContentLoaded para asegurar que el HTML
+        // del modal de setup exista ANTES de intentar poblarlo.
+        document.addEventListener('DOMContentLoaded', () => {
+            // Asignar el listener al input
+            const teamCountInput = document.getElementById('teamCount');
+            if (teamCountInput) {
+                teamCountInput.addEventListener('input', updateTeamSetup);
+            }
+            
+            // Llamar una vez para poblar el modal con los valores por defecto
+            updateTeamSetup();
+        });
+
+    </script>
+</body>
+</html>
